@@ -6,7 +6,6 @@
 package ru.anglerhood.pastebin.test;
 
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.PagingState;
 import com.datastax.driver.core.Session;
 import org.junit.*;
 

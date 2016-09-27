@@ -5,11 +5,6 @@
 package ru.anglerhood.pastebin;
 
 import com.datastax.driver.core.*;
-import com.datastax.driver.core.querybuilder.QueryBuilder;
-import com.datastax.driver.mapping.Mapper;
-import com.datastax.driver.mapping.MappingManager;
-
-
 import java.util.*;
 
 public class EntryRepository {
