@@ -126,14 +126,14 @@ public class RepositoryTest {
 
 
         EntriesPage page = underTest.getAllEntries(Optional.empty());
-        page.getPagingState();
+        page.getPagingString();
         List<Optional<Entry>>  resultEntriesPage = page.getEntries();
 
         int count = resultEntriesPage.size();
         assertEquals(count, pageSize);
 
-        while(page.getPagingState().isPresent()){
-            page = underTest.getAllEntries(page.getPagingState());
+        while(page.getPagingString().isPresent()){
+            page = underTest.getAllEntries(page.getPagingString());
             resultEntriesPage.addAll(page.getEntries());
         }
 

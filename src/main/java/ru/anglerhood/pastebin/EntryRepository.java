@@ -15,11 +15,9 @@ public class EntryRepository {
     public static final String INSERT_PRIVATE = "INSERT into private_entries" +
             "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private) " +
             "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
+
     private final Session session;
-
-
     private final int pageSize;
-
 
     public EntryRepository(Session session, int pageSize){
         this.pageSize = pageSize;
@@ -70,9 +68,6 @@ public class EntryRepository {
         session.execute(bound);
     }
 
-
-
-
     private PreparedStatement prepareInsert(Entry entry) {
         PreparedStatement st;
         if(entry.isPrivate()){
@@ -107,12 +102,20 @@ public class EntryRepository {
         session.execute(bound);
     }
 
-    public EntriesPage getAllEntries(Optional<PagingState> requestedPage){
+    /**
+     * Retrieves all entries from storage in descending order by creation date with pagination.
+     * Default page size is 5 entries. Page size can be set in {@link EntryRepository} constructor.
+     *
+     * @param requestedPage
+     * @return
+     */
+
+    public EntriesPage getAllEntries(Optional<String> requestedPage){
         Statement st = new SimpleStatement("SELECT * FROM latest_entries");
         st.setFetchSize(pageSize);
 
         if(requestedPage.isPresent()){
-            st.setPagingState(requestedPage.get());
+            st.setPagingState(PagingState.fromString(requestedPage.get()));
         }
 
         ResultSet rs = session.execute(st);
@@ -125,7 +128,13 @@ public class EntryRepository {
             remaining--;
         }
 
-        return new EntriesPage(Optional.ofNullable(nextPage), entryList);
+        Optional<String> nextPageMaybe;
+        if(nextPage == null) {
+            nextPageMaybe = Optional.empty();
+        } else {
+            nextPageMaybe = Optional.ofNullable(nextPage.toString());
+        }
+        return new EntriesPage(nextPageMaybe, entryList);
     }
 
     /**
@@ -160,8 +169,6 @@ public class EntryRepository {
                 .setString("secret", entry.getSecret())
                 .setBool("isPrivate", entry.isPrivate());
     }
-
-
 
     private Optional<Entry> renderEntry(Row row) {
         if(row != null){
