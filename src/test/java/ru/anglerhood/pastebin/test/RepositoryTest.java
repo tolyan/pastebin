@@ -6,20 +6,21 @@
 package ru.anglerhood.pastebin.test;
 
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.PagingState;
 import com.datastax.driver.core.Session;
 import org.junit.*;
 
+import ru.anglerhood.pastebin.EntriesPage;
 import ru.anglerhood.pastebin.Entry;
 
 import ru.anglerhood.pastebin.EntryRepository;
 import ru.anglerhood.pastebin.exception.EntryNotFoundException;
 
-import java.util.Date;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class RepositoryTest {
@@ -36,12 +37,14 @@ public class RepositoryTest {
                 .build();
         session = cluster.connect("pastebin");
         underTest = new EntryRepository(session, pageSize);
-        session.execute("TRUNCATE pastebin_entries");
+        session.execute("TRUNCATE public_entries");
+        session.execute("TRUNCATE private_entries");
     }
 
     @After
     public void clear() {
-//        session.execute("TRUNCATE pastebin_entries");
+        session.execute("TRUNCATE public_entries");
+        session.execute("TRUNCATE private_entries");
         cluster.close();
     }
 
@@ -67,7 +70,6 @@ public class RepositoryTest {
         assertEquals(abstractEntry, result);
         assertEquals(uuid, result.getUuid());
         assertEquals(date, result.getCreatedAt());
-        assertEquals(date, result.getModifiedAt());
         assertEquals(title, result.getTitle());
         assertEquals(body, result.getBody());
         assertEquals(secret, result.getSecret());
@@ -81,7 +83,7 @@ public class RepositoryTest {
         String oldTitle = "Old Title";
         String oldBody = "Old Body";
         String oldSecret = "Old secret";
-        Boolean oldMark = false;
+        Boolean oldMark = true;
 
         Entry entry = new Entry(oldUUID, oldDate, oldDate, oldTitle, oldBody, oldDate, oldSecret, oldMark);
         underTest.save(entry);
@@ -91,10 +93,8 @@ public class RepositoryTest {
         String title = "Title";
         String body = "Body";
         String secret = "secret";
-        Boolean mark = true;
+        Boolean mark = false;
 
-;       entry.setCreatedAt(date);
-        entry.setModifiedAt(date);
         entry.setTitle(title);
         entry.setBody(body);
         entry.setExpires(date);
@@ -105,58 +105,60 @@ public class RepositoryTest {
         Entry result  = underTest.getEntry(oldUUID).
                 orElseThrow(() -> new EntryNotFoundException(oldUUID));
         assertEquals(entry.getUuid(), result.getUuid());
-        assertEquals(entry.getModifiedAt(), result.getModifiedAt());
         assertEquals(entry.getTitle(), result.getTitle());
         assertEquals(entry.getBody(), result.getBody());
         assertEquals(entry.isPrivate(), result.isPrivate());
         assertEquals(entry.getSecret(), result.getSecret());
 
         assertEquals(oldDate, result.getCreatedAt());
-
-
-
     }
 
     @Test
     public void write21GetAllPagesTest(){
-//        Date date = new Date();
-//        UUID uuid = UUID.randomUUID();
-//        String title = "Title";
-//        String body = "Body";
-//        String secret = "secret";
-//        Boolean privateMark = true;
-//
-//        int entriesAmount = 21;
-//        Stream<Entry> entries = IntStream.range(1, entriesAmount+1)
-//                .mapToObj(i -> new Entry(UUID.randomUUID(), new Date(), new Date(), title + i,
-//                        body, null, secret + i, false));
-//        entries.forEach(entry -> underTest.save(entry));
-//
-//
-//        EntriesPage page = underTest.getAllEntries(null);
-//        String pagingState = page.getPagingState();
-//        List<Entry> resultEntriesPage = page.getEntries();
-//
-//        int count = resultEntriesPage.size();
-//        assertEquals(count, pageSize);
-//
-//        while(pagingState != null){
-//            page = underTest.getAllEntries(pagingState);
-//            pagingState =  page.getPagingState();
-//            resultEntriesPage.addAll(page.getEntries());
-//        }
-//
-//        assertEquals(entriesAmount,resultEntriesPage.size());
-//        List<Entry> beforeSort = new ArrayList<>(resultEntriesPage);
-//        resultEntriesPage.sort((Entry e1, Entry e2) -> e2.getCreatedAt().compareTo(e1.getCreatedAt()));
-//
-//        assertTrue(beforeSort.equals(resultEntriesPage));
+        String title = "Title";
+        String body = "Body";
+        String secret = "secret";
+
+        int entriesAmount = 21;
+        Stream<Entry> entries = IntStream.range(1, entriesAmount+1)
+                .mapToObj(i -> new Entry(UUID.randomUUID(), new Date(), new Date(), title + i,
+                        body, null, secret + i, false));
+        entries.forEach(entry -> underTest.save(entry));
 
 
+        EntriesPage page = underTest.getAllEntries(Optional.empty());
+        page.getPagingState();
+        List<Optional<Entry>>  resultEntriesPage = page.getEntries();
 
+        int count = resultEntriesPage.size();
+        assertEquals(count, pageSize);
+
+        while(page.getPagingState().isPresent()){
+            page = underTest.getAllEntries(page.getPagingState());
+            resultEntriesPage.addAll(page.getEntries());
+        }
+
+
+        assertEquals(entriesAmount,resultEntriesPage.size());
+        List<Optional<Entry>>  beforeSort = new ArrayList<>(resultEntriesPage);
+        resultEntriesPage.sort((maybeE2, maybeE1) -> maybeE1.get().getCreatedAt().compareTo(maybeE2.get().getCreatedAt()));
+
+        assertTrue(beforeSort.equals(resultEntriesPage));
     }
 
-
+    @Test
+    public void writeDeleteTest(){
+        Date date = new Date();
+        UUID uuid = UUID.randomUUID();
+        String title = "Title";
+        String body = "Body";
+        String secret = "secret";
+        Boolean privateMark = true;
+        Entry abstractEntry = new Entry(uuid, date, date, title, body, date, secret, privateMark);
+        underTest.save(abstractEntry);
+        underTest.delete(abstractEntry);
+        assertFalse(underTest.getEntry(uuid).isPresent());
+    }
 
 
 }

@@ -6,18 +6,18 @@ package ru.anglerhood.pastebin;
 
 import java.util.Date;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 public class Entry {
     private Boolean isPrivate;
-    private Date createdAt;
-    private Date modifiedAt;
+    private final Date createdAt;
+    private final Date modifiedAt;
     private String title;
     private String body;
     private Date expires;
     private String secret;
     private UUID uuid;
-    public Entry(){}
 
     public Entry(UUID uuid,
                  Date createdAt,
@@ -49,16 +49,8 @@ public class Entry {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Date getModifiedAt() {
         return modifiedAt;
-    }
-
-    public void setModifiedAt(Date modifiedAt) {
-        this.modifiedAt = modifiedAt;
     }
 
     public String getTitle() {
@@ -100,7 +92,6 @@ public class Entry {
     public void setIsPrivate(Boolean aPrivate) {
         isPrivate = aPrivate;
     }
-
 
     @Override
     public int hashCode(){

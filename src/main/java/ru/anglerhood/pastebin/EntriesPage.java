@@ -4,23 +4,25 @@
  */
 package ru.anglerhood.pastebin;
 
+import com.datastax.driver.core.PagingState;
+
 import java.util.List;
 import java.util.Optional;
 
 public class EntriesPage {
-    private Optional<String> pagingState;
+    private Optional<PagingState> pagingState;
     private List<Optional<Entry>>entries;
 
-    public EntriesPage(Optional<String> pagingState, List<Optional<Entry>> entries){
+    public EntriesPage(Optional<PagingState> pagingState, List<Optional<Entry>> entries){
         this.pagingState = pagingState;
         this.entries = entries;
     }
 
-    public Optional<String> getPagingState() {
+    public Optional<PagingState> getPagingState() {
         return pagingState;
     }
 
-    public void setPagingState(String pagingState) {
+    public void setPagingState(PagingState pagingState) {
         this.pagingState = Optional.ofNullable(pagingState);
     }
 

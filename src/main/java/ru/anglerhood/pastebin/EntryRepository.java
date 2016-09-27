@@ -5,6 +5,7 @@
 package ru.anglerhood.pastebin;
 
 import com.datastax.driver.core.*;
+import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.mapping.Mapper;
 import com.datastax.driver.mapping.MappingManager;
 
@@ -13,6 +14,12 @@ import java.util.*;
 
 public class EntryRepository {
     public static final int DEFAULT_PAGE_SIZE = 5;
+    public static final String INSERT_PUBLIC = "INSERT into public_entries" +
+            "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private, dummy) " +
+            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate, 1)";
+    public static final String INSERT_PRIVATE = "INSERT into private_entries" +
+            "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private) " +
+            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
     private final Session session;
 
 
@@ -30,37 +37,87 @@ public class EntryRepository {
     }
 
     public Optional<Entry> getEntry(UUID entryId){
-        PreparedStatement st = session.prepare("SELECT * FROM pastebin_entries WHERE entry_uuid=?");
-        BoundStatement bound = st.bind(entryId);
-        ResultSet rs = session.execute(bound);
-        return renderEntry(rs.one());
+        PreparedStatement publicSt = session.prepare("SELECT * FROM public_entries WHERE entry_uuid=?;");
+        BoundStatement bound = publicSt.bind(entryId);
+        ResultSet publicRS = session.execute(bound);
+
+        PreparedStatement privateSt = session.prepare("SELECT * FROM private_entries WHERE entry_uuid=?;");
+        bound = privateSt.bind(entryId);
+        ResultSet privateRS = session.execute(bound);
+
+//      dealing with cassandra's eventual consistency  and our data duplication
+//      by getting latest modified row  from both column families
+
+        Optional<Entry> maybePublic = renderEntry(publicRS.one());
+        Optional<Entry> maybePrivate = renderEntry(privateRS.one());
+        Optional<Entry> result = Optional.empty();
+        if (maybePrivate.isPresent() && maybePublic.isPresent()){
+            int compare = maybePrivate.get().getModifiedAt().compareTo(maybePublic.get().getModifiedAt());
+            result = compare > 0 ? maybePrivate : maybePublic;
+        } else if (maybePrivate.isPresent()){
+            result = maybePrivate;
+        } else if (maybePublic.isPresent()){
+            result = maybePublic;
+        }
+
+        return result;
 
     }
 
+    /**
+     * Saves new instance of {@link Entry} to storage.
+     *
+     * @param entry
+     */
     public void save(Entry entry){
-        PreparedStatement st = session.prepare(
-                "INSERT into pastebin_entries" +
-                        "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        BoundStatement bound = st.bind(entry.getUuid(), entry.getCreatedAt(), entry.getModifiedAt(), entry.getTitle(),
-                entry.getBody(), entry.getExpires(), entry.getSecret(), entry.isPrivate());
+        PreparedStatement st = prepareInsert(entry);
+        BoundStatement bound = getBoundStatement(entry, st);
         session.execute(bound);
     }
 
+
+
+
+    private PreparedStatement prepareInsert(Entry entry) {
+        PreparedStatement st;
+        if(entry.isPrivate()){
+            st = session.prepare(INSERT_PRIVATE);
+        } else {
+            st = session.prepare(INSERT_PUBLIC);
+        }
+        return st;
+    }
+
+
+    /**
+     * Modifies fields of {@link Entry} instance in storage.
+     * @param entry
+     */
+
     public void update(Entry entry){
-        this.save(entry);
+        PreparedStatement st = prepareUpdate(entry);
+        BoundStatement bound = getBoundStatement(entry, st);
+        session.execute(bound);
     }
 
     public void delete(Entry entry){
+        PreparedStatement st = session.prepare(
+                "BEGIN BATCH " +
+                        "DELETE FROM private_entries WHERE entry_uuid = :id;" +
+                        "DELETE FROM public_entries WHERE entry_uuid = :id;" +
+                "APPLY BATCH;"
+        );
 
+        BoundStatement bound = st.bind().setUUID("id", entry.getUuid());
+        session.execute(bound);
     }
 
-    public EntriesPage getAllEntries(String requestedPage){
-        Statement st = new SimpleStatement("SELECT * FROM pastebin_entries");
+    public EntriesPage getAllEntries(Optional<PagingState> requestedPage){
+        Statement st = new SimpleStatement("SELECT * FROM latest_entries");
         st.setFetchSize(pageSize);
 
-        if(requestedPage != null){
-            st.setPagingState(PagingState.fromString(requestedPage));
+        if(requestedPage.isPresent()){
+            st.setPagingState(requestedPage.get());
         }
 
         ResultSet rs = session.execute(st);
@@ -73,8 +130,43 @@ public class EntryRepository {
             remaining--;
         }
 
-        return new EntriesPage(Optional.ofNullable(nextPage.toString()), entryList);
+        return new EntriesPage(Optional.ofNullable(nextPage), entryList);
     }
+
+    /**
+     * Upsert into corresponding cf and delete from public cf if upserting into private one.
+     Actual delete will happen only if {@link Entry#isPrivate} field have been changed.
+     We dont need to delete from private cf since we resolve eventual consistency during read
+     by row modification timestamp . Thus, we reduce amount of compaction work to be done.
+     *
+     */
+    private PreparedStatement prepareUpdate(Entry entry) {
+        PreparedStatement st;
+        if(entry.isPrivate()){
+            st = session.prepare(
+                    "BEGIN BATCH " +
+                        INSERT_PRIVATE +
+                        "DELETE FROM public_entries WHERE entry_uuid=:id;" +
+                    "APPLY BATCH;");
+        } else {
+            st = session.prepare(INSERT_PUBLIC);
+        }
+        return st;
+    }
+
+    private BoundStatement getBoundStatement(Entry entry, PreparedStatement st) {
+        return st.bind()
+                .setUUID("id", entry.getUuid())
+                .setTimestamp("createdAt", entry.getCreatedAt())
+                .setTimestamp("modifiedAt", new Date())
+                .setString("title", entry.getTitle())
+                .setString("body", entry.getBody())
+                .setTimestamp("expiresAt", entry.getExpires())
+                .setString("secret", entry.getSecret())
+                .setBool("isPrivate", entry.isPrivate());
+    }
+
+
 
     private Optional<Entry> renderEntry(Row row) {
         if(row != null){
