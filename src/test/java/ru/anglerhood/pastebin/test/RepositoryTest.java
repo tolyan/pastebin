@@ -7,15 +7,17 @@ package ru.anglerhood.pastebin.test;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
+import io.vertx.core.logging.LoggerFactory;
 import org.junit.*;
 
-import ru.anglerhood.pastebin.EntriesPage;
-import ru.anglerhood.pastebin.Entry;
+import ru.anglerhood.pastebin.bean.EntriesPage;
+import ru.anglerhood.pastebin.bean.Entry;
 
 import ru.anglerhood.pastebin.EntryRepository;
 import ru.anglerhood.pastebin.exception.EntryNotFoundException;
 
 import java.util.*;
+import io.vertx.core.logging.Logger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -27,6 +29,7 @@ public class RepositoryTest {
     private Cluster cluster;
     private Session session;
     private int pageSize = 5;
+    private final Logger logger = LoggerFactory.getLogger(RepositoryTest.class);
 
     @Before
     public void setup() {
@@ -67,12 +70,7 @@ public class RepositoryTest {
         Entry result = underTest.getEntry(uuid).
                 orElseThrow(() -> new EntryNotFoundException(uuid));
         assertEquals(abstractEntry, result);
-        assertEquals(uuid, result.getUuid());
-        assertEquals(date, result.getCreatedAt());
-        assertEquals(title, result.getTitle());
-        assertEquals(body, result.getBody());
-        assertEquals(secret, result.getSecret());
-       assertEquals(privateMark, result.isPrivate());
+        assertEquals(privateMark, result.getPrivate());
     }
 
     @Test
@@ -98,7 +96,7 @@ public class RepositoryTest {
         entry.setBody(body);
         entry.setExpires(date);
         entry.setSecret(secret);
-        entry.setIsPrivate(mark);
+        entry.setPrivate(mark);
 
         underTest.update(entry);
         Entry result  = underTest.getEntry(oldUUID).
@@ -106,10 +104,8 @@ public class RepositoryTest {
         assertEquals(entry.getUuid(), result.getUuid());
         assertEquals(entry.getTitle(), result.getTitle());
         assertEquals(entry.getBody(), result.getBody());
-        assertEquals(entry.isPrivate(), result.isPrivate());
+        assertEquals(entry.getPrivate(), result.getPrivate());
         assertEquals(entry.getSecret(), result.getSecret());
-
-        assertEquals(oldDate, result.getCreatedAt());
     }
 
     @Test

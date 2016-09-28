@@ -5,9 +5,15 @@
 package ru.anglerhood.pastebin;
 
 import com.datastax.driver.core.*;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import ru.anglerhood.pastebin.bean.EntriesPage;
+import ru.anglerhood.pastebin.bean.Entry;
+
 import java.util.*;
 
 public class EntryRepository {
+    private final Logger logger = LoggerFactory.getLogger(EntryRepository.class);
     public static final int DEFAULT_PAGE_SIZE = 5;
     public static final String INSERT_PUBLIC = "INSERT into public_entries" +
             "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private, dummy) " +
@@ -15,6 +21,14 @@ public class EntryRepository {
     public static final String INSERT_PRIVATE = "INSERT into private_entries" +
             "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private) " +
             "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
+
+    public static final String UPDATE_PUBLIC = "INSERT into public_entries" +
+            "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private, dummy) " +
+            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate, 1)";
+
+    public static final String UPDATE_PRIVATE = "INSERT into private_entries" +
+            "(entry_uuid, modified_at, title, body, expires_at, secret, is_private) " +
+            "VALUES (:id, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
 
     private final Session session;
     private final int pageSize;
@@ -30,6 +44,7 @@ public class EntryRepository {
     }
 
     public Optional<Entry> getEntry(UUID entryId){
+        logger.info("REQUEST: GET entry with id " + entryId.toString());
         PreparedStatement publicSt = session.prepare("SELECT * FROM public_entries WHERE entry_uuid=?;");
         BoundStatement bound = publicSt.bind(entryId);
         ResultSet publicRS = session.execute(bound);
@@ -63,14 +78,23 @@ public class EntryRepository {
      * @param entry
      */
     public void save(Entry entry){
+        logger.info("REQUEST: INSERT entry with id " + entry.getUuid().toString());
         PreparedStatement st = prepareInsert(entry);
-        BoundStatement bound = getBoundStatement(entry, st);
+        BoundStatement bound = st.bind()
+                .setUUID("id", entry.getUuid())
+                .setTimestamp("createdAt", new Date())
+                .setTimestamp("modifiedAt", new Date())
+                .setString("title", entry.getTitle())
+                .setString("body", entry.getBody())
+                .setTimestamp("expiresAt", entry.getExpires())
+                .setString("secret", entry.getSecret())
+                .setBool("isPrivate", entry.getPrivate());
         session.execute(bound);
     }
 
     private PreparedStatement prepareInsert(Entry entry) {
         PreparedStatement st;
-        if(entry.isPrivate()){
+        if(entry.getPrivate()){
             st = session.prepare(INSERT_PRIVATE);
         } else {
             st = session.prepare(INSERT_PUBLIC);
@@ -85,12 +109,21 @@ public class EntryRepository {
      */
 
     public void update(Entry entry){
+        logger.info("REQUEST: INSERT entry with id " + entry.getUuid().toString());
         PreparedStatement st = prepareUpdate(entry);
-        BoundStatement bound = getBoundStatement(entry, st);
+        BoundStatement bound = st.bind()
+                .setUUID("id", entry.getUuid())
+                .setTimestamp("modifiedAt", new Date())
+                .setString("title", entry.getTitle())
+                .setString("body", entry.getBody())
+                .setTimestamp("expiresAt", entry.getExpires())
+                .setString("secret", entry.getSecret())
+                .setBool("isPrivate", entry.getPrivate());
         session.execute(bound);
     }
 
     public void delete(Entry entry){
+        logger.info("REQUEST: DELETE entry with id " + entry.getUuid().toString());
         PreparedStatement st = session.prepare(
                 "BEGIN BATCH " +
                         "DELETE FROM private_entries WHERE entry_uuid = :id;" +
@@ -111,9 +144,12 @@ public class EntryRepository {
      */
 
     public EntriesPage getAllEntries(Optional<String> requestedPage){
+        logger.info("REQUEST: GET ALL PAGE with id: " + requestedPage.orElse("first"));
+
         Statement st = new SimpleStatement("SELECT * FROM latest_entries");
         st.setFetchSize(pageSize);
 
+        //TODO: findout how to wrap null value for page and rewrite to proper Java 8.
         if(requestedPage.isPresent()){
             st.setPagingState(PagingState.fromString(requestedPage.get()));
         }
@@ -140,34 +176,34 @@ public class EntryRepository {
     /**
      * Upsert into corresponding cf and delete from public cf if upserting into private one.
      Actual delete will happen only if {@link Entry#isPrivate} field have been changed.
-     We dont need to delete from private cf since we resolve eventual consistency during read
+     We dont need to delete from private cf since we anyway resolve eventual consistency during read
      by row modification timestamp . Thus, we reduce amount of compaction work to be done.
      *
      */
     private PreparedStatement prepareUpdate(Entry entry) {
         PreparedStatement st;
-        if(entry.isPrivate()){
+        if(entry.getPrivate()){
             st = session.prepare(
                     "BEGIN BATCH " +
-                        INSERT_PRIVATE +
+                        UPDATE_PRIVATE +
                         "DELETE FROM public_entries WHERE entry_uuid=:id;" +
                     "APPLY BATCH;");
         } else {
-            st = session.prepare(INSERT_PUBLIC);
+            st = session.prepare(UPDATE_PUBLIC);
         }
         return st;
     }
 
-    private BoundStatement getBoundStatement(Entry entry, PreparedStatement st) {
+    private BoundStatement getInsertBoundStatement(Entry entry, PreparedStatement st) {
         return st.bind()
                 .setUUID("id", entry.getUuid())
-                .setTimestamp("createdAt", entry.getCreatedAt())
+                .setTimestamp("createdAt", new Date())
                 .setTimestamp("modifiedAt", new Date())
                 .setString("title", entry.getTitle())
                 .setString("body", entry.getBody())
                 .setTimestamp("expiresAt", entry.getExpires())
                 .setString("secret", entry.getSecret())
-                .setBool("isPrivate", entry.isPrivate());
+                .setBool("isPrivate", entry.getPrivate());
     }
 
     private Optional<Entry> renderEntry(Row row) {

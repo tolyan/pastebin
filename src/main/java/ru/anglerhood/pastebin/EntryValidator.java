@@ -4,7 +4,7 @@
  */
 package ru.anglerhood.pastebin;
 
-import ru.anglerhood.pastebin.Entry;
+import ru.anglerhood.pastebin.bean.Entry;
 
 public class EntryValidator {
     public boolean validate(Entry abstractEntry){

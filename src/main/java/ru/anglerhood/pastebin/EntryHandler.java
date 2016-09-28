@@ -4,7 +4,9 @@
  */
 package ru.anglerhood.pastebin;
 
+import io.vertx.core.json.Json;
 import io.vertx.ext.web.RoutingContext;
+import ru.anglerhood.pastebin.bean.Entry;
 import ru.anglerhood.pastebin.exception.ValidationException;
 
 import java.security.SecureRandom;
@@ -20,6 +22,10 @@ public class EntryHandler {
     }
 
     public void createEntry(RoutingContext context){
+        context.getBodyAsJson();
+        context.response()
+                .setStatusCode(201)
+                .putHeader("content-type", "application/json; charset=utf-8");
 
     }
 
@@ -28,6 +34,7 @@ public class EntryHandler {
     }
 
     public void deleteEntry(RoutingContext context){
+        context.response().setStatusCode(204).end();
 
     }
 

@@ -43,7 +43,7 @@ public class PastebinVerticle extends AbstractVerticle{
         cluster = Cluster.builder()
                 .addContactPoint("localhost")
                 .build();
-        return cluster.connect("entries");
+        return cluster.connect("pastebin");
     }
 
 }
