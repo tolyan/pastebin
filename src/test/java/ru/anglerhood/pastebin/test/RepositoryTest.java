@@ -136,7 +136,8 @@ public class RepositoryTest {
 
         assertEquals(entriesAmount,resultEntriesPage.size());
         List<Optional<Entry>>  beforeSort = new ArrayList<>(resultEntriesPage);
-        resultEntriesPage.sort((maybeE2, maybeE1) -> maybeE1.get().getCreatedAt().compareTo(maybeE2.get().getCreatedAt()));
+        resultEntriesPage.sort((maybeE2, maybeE1) -> maybeE1.get().getCreatedAt()
+                                                    .compareTo(maybeE2.get().getCreatedAt()));
 
         assertTrue(beforeSort.equals(resultEntriesPage));
     }

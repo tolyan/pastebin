@@ -20,15 +20,15 @@ public class EntryRepository {
             "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate, 1)";
     public static final String INSERT_PRIVATE = "INSERT into private_entries" +
             "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private) " +
-            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
+            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate)";
 
     public static final String UPDATE_PUBLIC = "INSERT into public_entries" +
-            "(entry_uuid, created_at, modified_at, title, body, expires_at, secret, is_private, dummy) " +
-            "VALUES (:id, :createdAt, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate, 1)";
+            "(entry_uuid, modified_at, title, body, expires_at, secret, is_private, dummy) " +
+            "VALUES (:id, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate, 1)";
 
     public static final String UPDATE_PRIVATE = "INSERT into private_entries" +
             "(entry_uuid, modified_at, title, body, expires_at, secret, is_private) " +
-            "VALUES (:id, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate);";
+            "VALUES (:id, :modifiedAt, :title, :body, :expiresAt, :secret, :isPrivate)";
 
     private final Session session;
     private final int pageSize;
@@ -44,7 +44,7 @@ public class EntryRepository {
     }
 
     public Optional<Entry> getEntry(UUID entryId){
-        logger.info("REQUEST: GET entry with id " + entryId.toString());
+        logger.info("C* REQUEST: GET entry with id " + entryId.toString());
         PreparedStatement publicSt = session.prepare("SELECT * FROM public_entries WHERE entry_uuid=?;");
         BoundStatement bound = publicSt.bind(entryId);
         ResultSet publicRS = session.execute(bound);
@@ -78,7 +78,7 @@ public class EntryRepository {
      * @param entry
      */
     public void save(Entry entry){
-        logger.info("REQUEST: INSERT entry with id " + entry.getUuid().toString());
+        logger.info("C* REQUEST: INSERT entry with id " + entry.getUuid().toString());
         PreparedStatement st = prepareInsert(entry);
         BoundStatement bound = st.bind()
                 .setUUID("id", entry.getUuid())
@@ -95,9 +95,9 @@ public class EntryRepository {
     private PreparedStatement prepareInsert(Entry entry) {
         PreparedStatement st;
         if(entry.getPrivate()){
-            st = session.prepare(INSERT_PRIVATE);
+            st = session.prepare(INSERT_PRIVATE + getTTLClause(entry.getExpires()));
         } else {
-            st = session.prepare(INSERT_PUBLIC);
+            st = session.prepare(INSERT_PUBLIC + getTTLClause(entry.getExpires()));
         }
         return st;
     }
@@ -109,7 +109,7 @@ public class EntryRepository {
      */
 
     public void update(Entry entry){
-        logger.info("REQUEST: INSERT entry with id " + entry.getUuid().toString());
+        logger.info("C* REQUEST: INSERT entry with id " + entry.getUuid().toString());
         PreparedStatement st = prepareUpdate(entry);
         BoundStatement bound = st.bind()
                 .setUUID("id", entry.getUuid())
@@ -123,7 +123,7 @@ public class EntryRepository {
     }
 
     public void delete(Entry entry){
-        logger.info("REQUEST: DELETE entry with id " + entry.getUuid().toString());
+        logger.info("C* REQUEST: DELETE entry with id " + entry.getUuid().toString());
         PreparedStatement st = session.prepare(
                 "BEGIN BATCH " +
                         "DELETE FROM private_entries WHERE entry_uuid = :id;" +
@@ -144,7 +144,7 @@ public class EntryRepository {
      */
 
     public EntriesPage getAllEntries(Optional<String> requestedPage){
-        logger.info("REQUEST: GET ALL PAGE with id: " + requestedPage.orElse("first"));
+        logger.info("REQUEST: GET ALL where PAGE with id: " + requestedPage.orElse("first"));
 
         Statement st = new SimpleStatement("SELECT * FROM latest_entries");
         st.setFetchSize(pageSize);
@@ -185,25 +185,24 @@ public class EntryRepository {
         if(entry.getPrivate()){
             st = session.prepare(
                     "BEGIN BATCH " +
-                        UPDATE_PRIVATE +
+                        UPDATE_PRIVATE + getTTLClause(entry.getExpires()) + ";" +
                         "DELETE FROM public_entries WHERE entry_uuid=:id;" +
                     "APPLY BATCH;");
         } else {
-            st = session.prepare(UPDATE_PUBLIC);
+            st = session.prepare(UPDATE_PUBLIC + getTTLClause(entry.getExpires()));
         }
         return st;
     }
 
-    private BoundStatement getInsertBoundStatement(Entry entry, PreparedStatement st) {
-        return st.bind()
-                .setUUID("id", entry.getUuid())
-                .setTimestamp("createdAt", new Date())
-                .setTimestamp("modifiedAt", new Date())
-                .setString("title", entry.getTitle())
-                .setString("body", entry.getBody())
-                .setTimestamp("expiresAt", entry.getExpires())
-                .setString("secret", entry.getSecret())
-                .setBool("isPrivate", entry.getPrivate());
+    private String getTTLClause(Date expireDate){
+        String result = "";
+        if(expireDate != null) {
+            long ttl = expireDate.getTime() - (new Date()).getTime();
+            if (ttl > 0) {
+                result = "USING TTL " + Long.toString(ttl);
+            }
+        }
+        return result;
     }
 
     private Optional<Entry> renderEntry(Row row) {
