@@ -43,6 +43,11 @@ public class EntryRepository {
         this.session = session;
     }
 
+    /**
+     * Retrieves entry data from public and private cfs, compares them and return the latest one.
+     * @param entryId
+     * @return
+     */
     public Optional<Entry> getEntry(UUID entryId){
         logger.info("C* REQUEST: GET entry with id " + entryId.toString());
         PreparedStatement publicSt = session.prepare("SELECT * FROM public_entries WHERE entry_uuid=?;");
@@ -122,6 +127,11 @@ public class EntryRepository {
         session.execute(bound);
     }
 
+    /**
+     * Deletes entry from private and public cfs both
+     * @param entry
+     */
+
     public void delete(Entry entry){
         logger.info("C* REQUEST: DELETE entry with id " + entry.getUuid().toString());
         PreparedStatement st = session.prepare(
@@ -176,7 +186,7 @@ public class EntryRepository {
     /**
      * Upsert into corresponding cf and delete from public cf if upserting into private one.
      Actual delete will happen only if {@link Entry#isPrivate} field have been changed.
-     We dont need to delete from private cf since we anyway resolve eventual consistency during read
+     We don't need to delete from private cf since we anyway resolve eventual consistency during read
      by row modification timestamp . Thus, we reduce amount of compaction work to be done.
      *
      */
@@ -194,6 +204,11 @@ public class EntryRepository {
         return st;
     }
 
+    /**
+     * Generate TTL clause for upsert as difference between 'expires' field and current millis.
+     * @param expireDate
+     * @return
+     */
     private String getTTLClause(Date expireDate){
         String result = "";
         if(expireDate != null) {

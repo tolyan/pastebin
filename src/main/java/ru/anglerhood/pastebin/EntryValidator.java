@@ -9,7 +9,16 @@ import ru.anglerhood.pastebin.exception.ValidationException;
 
 import java.util.Date;
 
+/**
+ * Basic validator for entries. Can be developed further for validation rules support.
+ */
 public class EntryValidator {
+
+    /**
+     * Checks if expires date is in the future.
+     * @param abstractEntry
+     * @throws ValidationException
+     */
     public void validate (Entry abstractEntry) throws ValidationException {
         Date expires = abstractEntry.getExpires();
         if(expires != null){

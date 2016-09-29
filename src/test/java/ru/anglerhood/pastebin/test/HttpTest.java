@@ -10,7 +10,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpHeaders;
-import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -25,11 +24,8 @@ import ru.anglerhood.pastebin.PastebinVerticle;
 import ru.anglerhood.pastebin.bean.Entry;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.UUID;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 @RunWith(VertxUnitRunner.class)
 public class HttpTest {

@@ -4,18 +4,14 @@
  */
 package ru.anglerhood.pastebin;
 
-import io.netty.handler.codec.http.HttpResponse;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerResponse;
-import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.core.streams.Pump;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.sockjs.BridgeEventType;
 import io.vertx.ext.web.handler.sockjs.BridgeOptions;
@@ -30,7 +26,6 @@ import io.vertx.ext.web.handler.sockjs.SockJSHandler;
 
 import java.math.BigInteger;
 import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 

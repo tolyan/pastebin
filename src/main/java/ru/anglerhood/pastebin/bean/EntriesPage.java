@@ -7,6 +7,9 @@ package ru.anglerhood.pastebin.bean;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Convenience class for entries page handling
+ */
 public class EntriesPage {
     private Optional<String> pagingString;
     private List<Optional<Entry>>entries;
