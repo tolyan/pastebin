@@ -45,7 +45,7 @@ CREATE TABLE private_entries (
  This solution leads to another problem - synchronization between these 2 cfs. 
  Taking into account distributed nature of Cassandra and eventual consistensy we need 
  a tool to reliably retrieve true value at certain point of time if both cfs contain entries with same id.
- Such sition can happen only in case of modification of entry, thus we can store modification time and entry with the latest 
+ Such situation can happen only in case of modification of entry, thus we can store modification time and the entry with the latest
  modification time is the true one. Thus, we have following schema so far:
 
 <pre>
@@ -74,14 +74,14 @@ CREATE TABLE public_entries (
     );
  </pre>
   Second major requirement is to sort public entries by creation time. Cassandra automatically sorts rows by clustering key,
- but only withing partion defined by partion key. In order to sort all values we will need such partion key that is equal in
- all rows, i.e. constant (dummy). Such constant partion key will lead to "hot spots", but since our task is sem-synthetic
+ but only within partion defined by partion key. In order to sort all values we will need such partion key that is equal in
+ all rows, i.e. constant (dummy). Such constant partion key will lead to "hot spots", but since our task is semi-synthetic
  we can accept it. In real life situation we would need to question our data model. 
  
  <br/>  Also we need to include created_at field into primary key as clustering key, 
  but it will require 
  "read-before-write" during updates. So we need to find another solution - denormalize again. 
- Fortunatly, Cassandra 3 materialized view feater saves us from burden of synchronization with just another cf. And since 
+ Fortunately, Cassandra 3 materialized view feature saves us from burden of synchronization with just another cf. And since
  we can add only one column into primary key of materialized view we need to introduce our constant key as part of 
  primary key for public_entries cf. Our final result looks like:
  <pre>
