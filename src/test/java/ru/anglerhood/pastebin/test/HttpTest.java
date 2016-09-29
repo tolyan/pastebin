@@ -58,13 +58,12 @@ public class HttpTest {
     }
 
     @Test
-    public void createReadEntry(TestContext context) {
+    public void createReadEntryTest(TestContext context) {
         Entry entry = writeEntry(context);
 
         Async async2 = context.async();
         HttpClient client2 = vertx.createHttpClient();
-        logger.info("Second client start");
-        HttpClientRequest reqGet =  client2.get(PORT, HOST, "/entries/"+context.get("id"), getResp ->{
+        HttpClientRequest reqGet =  client2.get(PORT, HOST, "/api/entries/"+context.get("id"), getResp ->{
             context.assertEquals(200, getResp.statusCode());
             getResp.bodyHandler(respBody -> {
                 Entry getEntry = Json.decodeValue(respBody.toString(), Entry.class);
@@ -84,13 +83,12 @@ public class HttpTest {
 
 
     @Test
-    public void writeDelete(TestContext context){
+    public void writeDeleteTest(TestContext context){
         Entry entry = writeEntry(context);
 
         Async async2 = context.async();
         HttpClient client2 = vertx.createHttpClient();
-        logger.info("Second client start");
-        HttpClientRequest reqGet =  client2.delete(PORT, HOST, "/entries/" +
+        HttpClientRequest reqGet =  client2.delete(PORT, HOST, "/api/entries/" +
                                                                 context.get("id") + "/" +
                                                                 context.get("secret"), delResp ->{
             context.assertEquals(204, delResp.statusCode());
@@ -105,7 +103,7 @@ public class HttpTest {
 
 
     @Test
-    public void getPagedEntries(TestContext context){
+    public void getPagedEntriesTest(TestContext context){
         Entry entry = new Entry();
         entry.setBody("body");
         entry.setTitle("title");
@@ -117,7 +115,7 @@ public class HttpTest {
         Async async = context.async(entriesAmount);
 
         IntStream.range(0, entriesAmount).forEach(i -> {
-            HttpClientRequest req = client.post(PORT, HOST, "/entries", resp -> {
+            HttpClientRequest req = client.post(PORT, HOST, "/api/entries", resp -> {
                 context.assertEquals(201, resp.statusCode());
                 resp.bodyHandler(postBody -> {
                     Entry returnEntry = Json.decodeValue(postBody.toString(), Entry.class);
@@ -139,7 +137,7 @@ public class HttpTest {
 
         HttpClient client2 = vertx.createHttpClient();
         Async async2 = context.async();
-        HttpClientRequest reqGet = client2.get(PORT, HOST, "/entries", resp -> {
+        HttpClientRequest reqGet = client2.get(PORT, HOST, "/api/entries", resp -> {
             context.assertEquals(200, resp.statusCode());
             resp.bodyHandler(getBody -> {
                 HashMap map = Json.decodeValue(getBody.toString(), HashMap.class);
@@ -160,7 +158,7 @@ public class HttpTest {
 
         HttpClient client3 = vertx.createHttpClient();
         Async async3 = context.async();
-        HttpClientRequest nextReqGet = client3.get(PORT, HOST, "/entries?page=" + context.get("page"), resp -> {
+        HttpClientRequest nextReqGet = client3.get(PORT, HOST, "/api/entries?page=" + context.get("page"), resp -> {
             context.assertEquals(200, resp.statusCode());
             resp.bodyHandler(getBody -> {
                 HashMap map = Json.decodeValue(getBody.toString(), HashMap.class);
@@ -178,6 +176,96 @@ public class HttpTest {
 
     }
 
+    @Test
+    public void writeUpdateReadTest(TestContext context){
+        Entry entry = writeEntry(context);
+
+        HttpClient client2 = vertx.createHttpClient();
+        Async async2 = context.async();
+        String newBody = "newBody";
+        entry.setBody(newBody);
+        HttpClientRequest reqPut = client2.put(PORT, HOST, "/api/entries/" +
+                                                            context.get("id") + "/" +
+                                                            context.get("secret"), resp -> {
+            context.assertEquals(200, resp.statusCode());
+            resp.bodyHandler(getBody -> {
+
+                client2.close();
+                async2.complete();
+            });
+
+        });
+
+        String body = Json.encodePrettily(entry);
+        reqPut.headers().add(HttpHeaders.CONTENT_TYPE,"application/json charset=utf-8");
+        reqPut.headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(body.length()));
+        reqPut.write(body);
+        reqPut.exceptionHandler(context::fail);
+        reqPut.end();
+
+        async2.awaitSuccess();
+
+        Async async3 = context.async();
+        HttpClient client3 = vertx.createHttpClient();
+        HttpClientRequest reqGet =  client3.get(PORT, HOST, "/api/entries/"+context.get("id"), getResp ->{
+            context.assertEquals(200, getResp.statusCode());
+            getResp.bodyHandler(respBody -> {
+                Entry getEntry = Json.decodeValue(respBody.toString(), Entry.class);
+                context.assertEquals(getEntry.getBody(), entry.getBody());
+                context.assertEquals(getEntry.getTitle(), entry.getTitle());
+                context.assertEquals(getEntry.getPrivate(), entry.getPrivate());
+                context.assertEquals(getEntry.getExpires(), entry.getExpires());
+            });
+            client3.close();
+            async3.complete();
+        });
+
+        reqGet.headers().add(HttpHeaders.CONTENT_TYPE,"application/json; charset=utf-8");
+        reqGet.end();
+    }
+
+
+
+    @Test
+    public void eventBusTest(TestContext context){
+        Entry entry = new Entry();
+        entry.setBody("body");
+        entry.setTitle("title");
+        entry.setPrivate(false);
+        String body = Json.encode(entry);
+
+        HttpClient client = vertx.createHttpClient();
+        Async async = context.async(2);
+        HttpClientRequest req = client.post(PORT, HOST, "/api/entries", resp -> {
+            context.assertEquals(201, resp.statusCode());
+            resp.bodyHandler(postBody -> {
+                Entry returnEntry = Json.decodeValue(postBody.toString(), Entry.class);
+                context.assertTrue(returnEntry.getSecret().length() > 0);
+                context.assertEquals(entry.getBody(), returnEntry.getBody());
+
+            });
+
+        });
+
+
+        req.headers().add(HttpHeaders.CONTENT_TYPE,"application/x-www-form-urlencoded; charset=utf-8");
+        req.headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(body.length()));
+        req.write(body);
+        req.exceptionHandler(context::fail);
+        req.end();
+
+
+        vertx.eventBus().consumer("entry.created", event -> {
+            logger.info("got created message" + event.body());
+            Entry msgEntry = Json.decodeValue((String)event.body(), Entry.class);
+            context.assertEquals(entry.getBody(), msgEntry.getBody());
+            async.complete();
+            client.close();
+        });
+
+
+    }
+
     private Entry writeEntry(TestContext context) {
         Entry entry = new Entry();
         entry.setBody("body");
@@ -187,7 +275,7 @@ public class HttpTest {
 
         HttpClient client = vertx.createHttpClient();
         Async async = context.async(2);
-        HttpClientRequest req = client.post(PORT, HOST, "/entries", resp -> {
+        HttpClientRequest req = client.post(PORT, HOST, "/api/entries", resp -> {
             context.assertEquals(201, resp.statusCode());
             resp.bodyHandler(postBody -> {
                 Entry returnEntry = Json.decodeValue(postBody.toString(), Entry.class);

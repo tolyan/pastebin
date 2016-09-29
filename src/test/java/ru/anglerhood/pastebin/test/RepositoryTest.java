@@ -70,6 +70,7 @@ public class RepositoryTest {
         Entry result = underTest.getEntry(uuid).
                 orElseThrow(() -> new EntryNotFoundException(uuid));
         assertEquals(abstractEntry, result);
+        assertEquals(abstractEntry.getBody(), result.getBody());
         assertEquals(privateMark, result.getPrivate());
     }
 

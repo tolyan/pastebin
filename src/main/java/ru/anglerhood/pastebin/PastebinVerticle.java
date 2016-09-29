@@ -10,6 +10,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.ServerWebSocket;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 
@@ -34,28 +35,31 @@ public class PastebinVerticle extends AbstractVerticle{
         Router router = Router.router(vertx);
 
         router.route().handler(BodyHandler.create());
-        router.route().consumes("application/json");
-        router.route().produces("application/json");
+        router.route("/api/*").consumes("application/json");
+        router.route("/api/*").produces("application/json");
+        router.route("/latest").handler(handler::latest);
 
-        router.post("/entries")
+        router.post("/api/entries")
                 .consumes("application/x-www-form-urlencoded")
                 .produces("application/json")
                 .handler(handler::createEntry);
 
-        router.put("/entries/:id/:secret")
+        router.put("/api/entries/:id/:secret")
                 .handler(handler::updateEntry);
 
-        router.get("/entries")
+        router.get("/api/entries")
                 .handler(handler::listEntries);
 
-        router.get("/entries/:id")
+        router.get("/api/entries/:id")
                 .handler(handler::readEntry);
 
-        router.get("/entries/:id/:secret")
+        router.get("/api/entries/:id/:secret")
                 .handler(handler::readEntry);
 
-        router.delete("/entries/:id/:secret")
+        router.delete("/api/entries/:id/:secret")
                 .handler(handler::deleteEntry);
+
+
 
         vertx.createHttpServer().requestHandler(router::accept).listen(PORT);
     }

@@ -5,15 +5,20 @@
 package ru.anglerhood.pastebin;
 
 import io.netty.handler.codec.http.HttpResponse;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.streams.Pump;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.sockjs.BridgeEventType;
+import io.vertx.ext.web.handler.sockjs.BridgeOptions;
 import ru.anglerhood.pastebin.bean.EntriesPage;
 import ru.anglerhood.pastebin.bean.Entry;
 import ru.anglerhood.pastebin.exception.EntryNotFoundException;
@@ -21,6 +26,9 @@ import ru.anglerhood.pastebin.exception.ForbiddenException;
 import ru.anglerhood.pastebin.exception.MalformedException;
 import ru.anglerhood.pastebin.exception.ValidationException;
 
+import io.vertx.ext.web.handler.sockjs.SockJSHandler;
+
+import java.math.BigInteger;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Optional;
@@ -46,6 +54,9 @@ public class EntryHandler {
             repository.save(reqEntry);
             resp.setStatusCode(201);
             String chunk = Json.encodePrettily(reqEntry);
+            if(!reqEntry.getPrivate()){
+                context.vertx().eventBus().publish("entry.created", chunk);
+            }
             resp.headers().add(HttpHeaders.CONTENT_LENGTH, Integer.toString(chunk.length()));
             resp.write(chunk);
 
@@ -110,7 +121,7 @@ public class EntryHandler {
                     .map(s -> s.equals(result.getSecret()))
                     .orElseThrow(ForbiddenException::new)){
                 result.setTitle(reqEntry.getTitle());
-                result.setBody(reqEntry.getTitle());
+                result.setBody(reqEntry.getBody());
                 result.setExpires(reqEntry.getExpires());
                 result.setPrivate(reqEntry.getPrivate());
                 repository.update(result);
@@ -200,9 +211,16 @@ public class EntryHandler {
 
     private String generateSecret() {
         SecureRandom random = new SecureRandom();
-        byte bytes[] = new byte[12];
-        random.nextBytes(bytes);
-        return Base64.getEncoder().encodeToString(bytes);
+        return new BigInteger(130, random).toString(32).toString();
     }
 
+    public SockJSHandler latest(RoutingContext context) {
+        BridgeOptions options = new BridgeOptions();
+        return SockJSHandler.create(context.vertx()).bridge(options, event -> {
+            if (event.type() == BridgeEventType.SOCKET_CREATED) {
+                logger.info("A socket was created");
+            }
+            event.complete(true);
+        });
+    }
 }
