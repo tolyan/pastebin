@@ -1,3 +1,29 @@
+Test case for REST-like web service that allows clients to share plain-text entries (pastes).
+
+The service should allow client to create public and private entries. Private entries could only be accessed by direct link while public entries a available in global entries list accessible by everyone. Entry could be configured to expire after some date/time. Client could edit or delete entry only if he/she supplies a secret code returned by the service in response on new entry request.
+
+Requirements
+
+POST /entries - registers new entry. request parameters:
+body - contents
+title - optional name/title
+expires - optional entry exiration timestamp
+private - optional flag indicating that entry is private and shouldn't be added to list of entries
+GET /entries - returns a paginated list of public entries sorted by creation date in descending order
+PUT /entries/:entry-id - update existing entry. accepts same aguments as #1. also requires secret parameter containing the secret code for that entry
+DELETE /entries/:entry-id - removes existing entry. requires secret code
+Service should expose web-socket endpoint under /latest path. All clients connected/subscribed to the endpoint should be receive all new public entries
+Service should support JSON (application/json) content type and x-www-form-urlencoded where appropriate
+Service should be implemented in Java language (Java8) with Vert.x 3.3 framework and use Cassandra 3.x as a persistent storage
+Deliverables
+
+Archive or URL to public git repo containing
+
+Maven3/Gradle-based project
+Unit/Integration tests integrated into build process
+Dockerfile to create ready-to-run docker image
+Cassandra database schema definition
+
 # pastebin
 
 Additional comments on Cassandra schema.
