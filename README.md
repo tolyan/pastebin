@@ -1,3 +1,5 @@
+# pastebin
+
 Test case for REST-like web service that allows clients to share plain-text entries (pastes).
 
 The service should allow client to create public and private entries. Private entries could only be accessed by direct link while public entries a available in global entries list accessible by everyone. Entry could be configured to expire after some date/time. Client could edit or delete entry only if he/she supplies a secret code returned by the service in response on new entry request.
@@ -24,7 +26,7 @@ Unit/Integration tests integrated into build process
 Dockerfile to create ready-to-run docker image
 Cassandra database schema definition
 
-# pastebin
+
 
 Additional comments on Cassandra schema.
 First requirement to support basic CRUD operations is a trivial task and results in schema with unique id as partion key.
