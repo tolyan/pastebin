@@ -26,7 +26,7 @@ Unit/Integration tests integrated into build process
 Dockerfile to create ready-to-run docker image
 Cassandra database schema definition
 
-
+--------------
 
 Additional comments on Cassandra schema.
 First requirement to support basic CRUD operations is a trivial task and results in schema with unique id as partion key.
