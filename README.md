@@ -59,7 +59,7 @@ CREATE TABLE private_entries (
     PRIMARY KEY(entry_uuid)
     );
     
- CREATE TABLE private_entries (
+ CREATE TABLE public_entries (
     entry_uuid uuid,
     created_at timestamp,
     title text,
